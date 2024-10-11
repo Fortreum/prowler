@@ -1,5 +1,5 @@
 {
-  "Framework": "FedRamp-Moderate-Revision-4",
+  "Framework": "FedRamp-Moderate-Revision-5",
   "Version": "",
   "Provider": "AWS",
   "Description": "The Federal Risk and Authorization Management Program (FedRAMP) was established in 2011. It provides a cost-effective, risk-based approach for the adoption and use of cloud services by the U.S. federal government. FedRAMP empowers federal agencies to use modern cloud technologies, with an emphasis on the security and protection of federal information.",
@@ -512,8 +512,8 @@
     },
     {
       "Id": "au-9-2",
-      "Name": "AU-9(2) Audit Backup On Separate Physical Systems / Components",
-      "Description": "The information system backs up audit records at least weekly onto a physically different system or system component than the system or component being audited.",
+      "Name": "AU-9(2) Store on Separate Physical Systems or Components",
+      "Description": "Store audit records [FedRAMP Assignment: at least weekly] in a repository that is part of a physically different system or system component than the system or component being audited.",
       "Attributes": [
         {
           "ItemId": "au-9-2",
@@ -748,47 +748,43 @@
       ]
     },
     {
-      "Id": "ia-2-1-2",
-      "Name": "IA-2(1)(2)",
-      "Description": "(1) The information system implements multifactor authentication for network access to privileged accounts. (2) The information system implements multifactor authentication for network access to non- privileged accounts.",
+      "Id": "ia-2-2",
+      "Name": "IA-2(2) Identification and Authentication (Organizational Users) | Multi-factor Authentication to Non-privileged Accounts​​​​​​​",
+      "Description": "Implement multi-factor authentication for access to non-privileged accounts.",
       "Attributes": [
         {
-          "ItemId": "ia-2-1-2",
+          "ItemId": "ia-2-2",
           "Section": "Identification and Authentication (IA)",
-          "SubSection": "IA-2(1) Network Access To Privileged Accounts",
+          "SubSection": "IA-2(2) Multi-factor Authentication to Non-privileged Accounts​​​​​​​",
           "Service": "iam"
         }
       ],
       "Checks": [
-        "iam_root_mfa_enabled",
-        "iam_user_mfa_enabled_console_access",
-        "iam_user_mfa_enabled_console_access",
-        "iam_root_hardware_mfa_enabled"
-      ]
-    },
-    {
-      "Id": "ia-2-1",
-      "Name": "IA-2(1) Network Access To Privileged Accounts",
-      "Description": "The information system implements multi-factor authentication for network access to privileged accounts.",
-      "Attributes": [
-        {
-          "ItemId": "ia-2-1",
-          "Section": "Identification and Authentication (IA)",
-          "SubSection": "Identification and Authentication (Organizational users) (IA-2)",
-          "Service": "iam"
-        }
-      ],
-      "Checks": [
-        "iam_root_hardware_mfa_enabled",
-        "iam_root_mfa_enabled",
         "iam_user_mfa_enabled_console_access",
         "iam_user_mfa_enabled_console_access"
       ]
     },
     {
+      "Id": "ia-2-1",
+      "Name": "IA-2(1): Identification and Authentication (Organizational Users) | Multi-factor Authentication to Privileged Accounts",
+      "Description": "Implement multi-factor authentication for access to privileged accounts.",
+      "Attributes": [
+        {
+          "ItemId": "ia-2-1",
+          "Section": "Identification and Authentication (IA)",
+          "SubSection": "IA-2(1) Multi-factor Authentication to Privileged Accounts",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "iam_root_hardware_mfa_enabled",
+        "iam_root_mfa_enabled"
+      ]
+    },
+    {
       "Id": "ia-2",
       "Name": "Identification and Authentication (Organizational users) (IA-2)",
-      "Description": "The information system uniquely identifies and authenticates organizational users (or processes acting on behalf of organizational users).",
+      "Description": "Uniquely identify and authenticate organizational users and associate that unique identification with processes acting on behalf of those users.",
       "Attributes": [
         {
           "ItemId": "ia-2",
