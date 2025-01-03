@@ -18,6 +18,13 @@ class Bedrock(AWSService):
         self.__threading_call__(self._get_guardrail, self.guardrails.values())
         self.__threading_call__(self._list_tags_for_resource, self.guardrails.values())
 
+    def _get_model_invocation_logging_arn_template(self, region):
+        return (
+            f"arn:{self.audited_partition}:bedrock:{region}:{self.audited_account}:model-invocation-logging"
+            if region
+            else f"arn:{self.audited_partition}:bedrock:{self.region}:{self.audited_account}:model-invocation-logging"
+        )
+
     def _get_model_invocation_logging_configuration(self, regional_client):
         logger.info("Bedrock - Getting Model Invocation Logging Configuration...")
         try:
@@ -110,3 +117,58 @@ class Guardrail(BaseModel):
     tags: Optional[list] = []
     sensitive_information_filter: bool = False
     prompt_attack_filter_strength: Optional[str]
+
+
+class BedrockAgent(AWSService):
+    def __init__(self, provider):
+        # Call AWSService's __init__
+        super().__init__("bedrock-agent", provider)
+        self.agents = {}
+        self.__threading_call__(self._list_agents)
+        self.__threading_call__(self._list_tags_for_resource, self.agents.values())
+
+    def _list_agents(self, regional_client):
+        logger.info("Bedrock Agent - Listing Agents...")
+        try:
+            for agent in regional_client.list_agents().get("agentSummaries", []):
+                agent_arn = f"arn:aws:bedrock:{regional_client.region}:{self.audited_account}:agent/{agent['agentId']}"
+                if not self.audit_resources or (
+                    is_resource_filtered(agent_arn, self.audit_resources)
+                ):
+                    self.agents[agent_arn] = Agent(
+                        id=agent["agentId"],
+                        name=agent["agentName"],
+                        arn=agent_arn,
+                        guardrail_id=agent.get("guardrailConfiguration", {}).get(
+                            "guardrailIdentifier"
+                        ),
+                        region=regional_client.region,
+                    )
+        except Exception as error:
+            logger.error(
+                f"{regional_client.region} -- {error.__class__.__name__}[{error.__traceback__.tb_lineno}]: {error}"
+            )
+
+    def _list_tags_for_resource(self, resource):
+        logger.info("Bedrock Agent - Listing Tags for Resource...")
+        try:
+            agent_tags = (
+                self.regional_clients[resource.region]
+                .list_tags_for_resource(resourceArn=resource.arn)
+                .get("tags", {})
+            )
+            if agent_tags:
+                resource.tags = [agent_tags]
+        except Exception as error:
+            logger.error(
+                f"{resource.region} -- {error.__class__.__name__}[{error.__traceback__.tb_lineno}]: {error}"
+            )
+
+
+class Agent(BaseModel):
+    id: str
+    name: str
+    arn: str
+    guardrail_id: Optional[str]
+    region: str
+    tags: Optional[list] = []

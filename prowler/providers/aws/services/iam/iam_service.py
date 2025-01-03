@@ -80,6 +80,12 @@ class IAM(AWSService):
         self.entities_role_attached_to_securityaudit_policy = (
             self._list_entities_role_for_policy(securityaudit_policy_arn)
         )
+        cloudshell_admin_policy_arn = (
+            f"arn:{self.audited_partition}:iam::aws:policy/AWSCloudShellFullAccess"
+        )
+        self.entities_attached_to_cloudshell_policy = self._list_entities_for_policy(
+            cloudshell_admin_policy_arn
+        )
         # List both Customer (attached and unattached) and AWS Managed (only attached) policies
         self.policies = []
         self.policies.extend(self._list_policies("AWS"))
@@ -96,6 +102,8 @@ class IAM(AWSService):
         self._get_last_accessed_services()
         self.user_temporary_credentials_usage = {}
         self._get_user_temporary_credentials_usage()
+        self.organization_features = []
+        self._list_organizations_features()
         # List missing tags
         self.__threading_call__(self._list_tags, self.users)
         self.__threading_call__(self._list_tags, self.roles)
@@ -104,7 +112,8 @@ class IAM(AWSService):
             [policy for policy in self.policies if policy.type == "Custom"],
         )
         self.__threading_call__(self._list_tags, self.server_certificates)
-        self.__threading_call__(self._list_tags, self.saml_providers.values())
+        if self.saml_providers is not None:
+            self.__threading_call__(self._list_tags, self.saml_providers.values())
 
     def _get_client(self):
         return self.client
@@ -685,6 +694,44 @@ class IAM(AWSService):
         finally:
             return roles
 
+    def _list_entities_for_policy(self, policy_arn):
+        logger.info("IAM - List Entities Role For Policy...")
+        try:
+            entities = {
+                "Users": [],
+                "Groups": [],
+                "Roles": [],
+            }
+
+            paginator = self.client.get_paginator("list_entities_for_policy")
+            for response in paginator.paginate(PolicyArn=policy_arn):
+                entities["Users"].extend(
+                    user["UserName"] for user in response.get("PolicyUsers", [])
+                )
+                entities["Groups"].extend(
+                    group["GroupName"] for group in response.get("PolicyGroups", [])
+                )
+                entities["Roles"].extend(
+                    role["RoleName"] for role in response.get("PolicyRoles", [])
+                )
+            return entities
+        except ClientError as error:
+            if error.response["Error"]["Code"] == "AccessDenied":
+                logger.error(
+                    f"{self.region} -- {error.__class__.__name__}[{error.__traceback__.tb_lineno}]: {error}"
+                )
+                entities = None
+            else:
+                logger.error(
+                    f"{self.region} -- {error.__class__.__name__}[{error.__traceback__.tb_lineno}]: {error}"
+                )
+        except Exception as error:
+            logger.error(
+                f"{self.region} -- {error.__class__.__name__}[{error.__traceback__.tb_lineno}]: {error}"
+            )
+        finally:
+            return entities
+
     def _list_policies(self, scope):
         logger.info("IAM - List Policies...")
         try:
@@ -915,6 +962,46 @@ class IAM(AWSService):
                     temporary_credentials_usage
                 )
 
+        except Exception as error:
+            logger.error(
+                f"{self.region} -- {error.__class__.__name__}[{error.__traceback__.tb_lineno}]: {error}"
+            )
+
+    def _list_organizations_features(self):
+        logger.info("IAM - List Organization Features...")
+        try:
+            organization_features = self.client.list_organizations_features()
+            self.organization_features = organization_features.get(
+                "EnabledFeatures", []
+            )
+        except ClientError as error:
+            if error.response["Error"]["Code"] == "OrganizationNotFoundException":
+                logger.warning(
+                    f"{self.region} -- {error.__class__.__name__}[{error.__traceback__.tb_lineno}]: {error}"
+                )
+            elif error.response["Error"]["Code"] == "ServiceAccessNotEnabledException":
+                logger.warning(
+                    f"{self.region} -- {error.__class__.__name__}[{error.__traceback__.tb_lineno}]: {error}"
+                )
+            elif (
+                error.response["Error"]["Code"]
+                == "OrganizationNotInAllFeaturesModeException"
+            ):
+                logger.warning(
+                    f"{self.region} -- {error.__class__.__name__}[{error.__traceback__.tb_lineno}]: {error}"
+                )
+            elif (
+                error.response["Error"]["Code"]
+                == "AccountNotManagementOrDelegatedAdministratorException"
+            ):
+                logger.warning(
+                    f"{self.region} -- {error.__class__.__name__}[{error.__traceback__.tb_lineno}]: {error}"
+                )
+                self.organization_features = None
+            else:
+                logger.error(
+                    f"{self.region} -- {error.__class__.__name__}[{error.__traceback__.tb_lineno}]: {error}"
+                )
         except Exception as error:
             logger.error(
                 f"{self.region} -- {error.__class__.__name__}[{error.__traceback__.tb_lineno}]: {error}"

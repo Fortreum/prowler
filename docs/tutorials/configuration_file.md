@@ -41,7 +41,7 @@ The following list includes all the AWS checks with configurable variables that 
 | `ec2_launch_template_no_secrets`                              | `secrets_ignore_patterns`                        | List of Strings |
 | `ec2_securitygroup_allow_ingress_from_internet_to_any_port`   | `ec2_allowed_instance_owners`                    | List of Strings |
 | `ec2_securitygroup_allow_ingress_from_internet_to_any_port`   | `ec2_allowed_interface_types`                    | List of Strings |
-| `ec2_securitygroup_allow_ingress_from_internet_to_high_risk_tcp_ports`| `ec2_sg_high_risk_ports`                 | List of Integer |
+| `ec2_securitygroup_allow_ingress_from_internet_to_high_risk_tcp_ports`| `ec2_high_risk_ports`                    | List of Integer |
 | `ec2_securitygroup_with_many_ingress_egress_rules`            | `max_security_group_rules`                       | Integer         |
 | `ecs_task_definitions_no_environment_secrets`                 | `secrets_ignore_patterns`                        | List of Strings |
 | `ecr_repositories_scan_vulnerabilities_in_latest_image`       | `ecr_repository_vulnerability_minimum_severity`  | String          |
@@ -57,6 +57,7 @@ The following list includes all the AWS checks with configurable variables that 
 | `rds_instance_backup_enabled`                                 | `check_rds_instance_replicas`                    | Boolean         |
 | `securityhub_enabled`                                         | `mute_non_default_regions`                       | Boolean         |
 | `secretsmanager_secret_unused`                                | `max_days_secret_unused`                         | Integer         |
+| `secretsmanager_secret_rotated_periodically`                  | `max_days_secret_unrotated`                      | Integer         |
 | `ssm_document_secrets`                                        | `secrets_ignore_patterns`                        | List of Strings |
 | `trustedadvisor_premium_support_plan_subscribed`              | `verify_premium_support_plans`                   | Boolean         |
 | `vpc_endpoint_connections_trust_boundaries`                   | `trusted_account_ids`                            | List of Strings |
@@ -74,6 +75,7 @@ The following list includes all the Azure checks with configurable variables tha
 | `app_ensure_php_version_is_latest`                            | `php_latest_version`                             | String          |
 | `app_ensure_python_version_is_latest`                         | `python_latest_version`                          | String          |
 | `app_ensure_java_version_is_latest`                           | `java_latest_version`                            | String          |
+| `sqlserver_recommended_minimal_tls_version`                   | `recommended_minimal_tls_versions`               | List of Strings |
 
 
 ## GCP
@@ -143,7 +145,7 @@ aws:
         "amazon-elb"
     ]
   # aws.ec2_securitygroup_allow_ingress_from_internet_to_high_risk_tcp_ports
-  ec2_sg_high_risk_ports:
+  ec2_high_risk_ports:
     [
         25,
         110,
@@ -445,6 +447,14 @@ azure:
   python_latest_version: "3.12"
   # azure.app_ensure_java_version_is_latest
   java_latest_version: "17"
+
+  # Azure SQL Server
+  # azure.sqlserver_minimal_tls_version
+  recommended_minimal_tls_versions:
+    [
+      "1.2",
+      "1.3"
+    ]
 
 # GCP Configuration
 gcp:

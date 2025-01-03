@@ -42,8 +42,10 @@ class GuardDuty(AWSService):
             if not detectors:
                 self.detectors.append(
                     Detector(
-                        id=self.audited_account,
-                        arn=self.audited_account_arn,
+                        id="detector/unknown",
+                        arn=self.get_unknown_arn(
+                            region=regional_client.region, resource_type="detector"
+                        ),
                         region=regional_client.region,
                         enabled_in_account=False,
                     )
@@ -99,6 +101,11 @@ class GuardDuty(AWSService):
                         and feat.get("Status", "DISABLED") == "ENABLED"
                     ):
                         detector.lambda_protection = True
+                    elif (
+                        feat.get("Name", "") == "EKS_RUNTIME_MONITORING"
+                        and feat.get("Status", "DISABLED") == "ENABLED"
+                    ):
+                        detector.eks_runtime_monitoring = True
 
         except Exception as error:
             logger.error(
@@ -223,5 +230,6 @@ class Detector(BaseModel):
     s3_protection: bool = False
     rds_protection: bool = False
     eks_audit_log_protection: bool = False
+    eks_runtime_monitoring: bool = False
     lambda_protection: bool = False
     ec2_malware_protection: bool = False

@@ -18,7 +18,8 @@ class Backup(AWSService):
         self.backup_vault_arn_template = f"arn:{self.audited_partition}:backup:{self.region}:{self.audited_account}:backup-vault"
         self.backup_vaults = []
         self.__threading_call__(self._list_backup_vaults)
-        self.__threading_call__(self._list_tags, self.backup_vaults)
+        if self.backup_vaults is not None:
+            self.__threading_call__(self._list_tags, self.backup_vaults)
         self.backup_plans = []
         self.__threading_call__(self._list_backup_plans)
         self.__threading_call__(self._list_tags, self.backup_plans)
@@ -26,6 +27,9 @@ class Backup(AWSService):
         self.__threading_call__(self._list_backup_report_plans)
         self.protected_resources = []
         self.__threading_call__(self._list_backup_selections)
+        self.recovery_points = []
+        self.__threading_call__(self._list_recovery_points)
+        self.__threading_call__(self._list_tags, self.recovery_points)
 
     def _list_backup_vaults(self, regional_client):
         logger.info("Backup - Listing Backup Vaults...")
@@ -169,13 +173,48 @@ class Backup(AWSService):
 
     def _list_tags(self, resource):
         try:
-            tags = self.regional_clients[resource.region].list_tags(
-                ResourceArn=resource.arn
-            )["Tags"]
-            resource.tags = [tags] if tags else []
+            if getattr(resource, "arn", None):
+                tags = self.regional_clients[resource.region].list_tags(
+                    ResourceArn=resource.arn
+                )["Tags"]
+                resource.tags = [tags] if tags else []
         except Exception as error:
             logger.error(
                 f"{self.region} -- {error.__class__.__name__}[{error.__traceback__.tb_lineno}]: {error}"
+            )
+
+    def _list_recovery_points(self, regional_client):
+        logger.info("Backup - Listing Recovery Points...")
+        try:
+            if self.backup_vaults:
+                for backup_vault in self.backup_vaults:
+                    paginator = regional_client.get_paginator(
+                        "list_recovery_points_by_backup_vault"
+                    )
+                    for page in paginator.paginate(BackupVaultName=backup_vault.name):
+                        for recovery_point in page.get("RecoveryPoints", []):
+                            arn = recovery_point.get("RecoveryPointArn")
+                            if arn:
+                                self.recovery_points.append(
+                                    RecoveryPoint(
+                                        arn=arn,
+                                        id=arn.split(":")[-1],
+                                        backup_vault_name=backup_vault.name,
+                                        encrypted=recovery_point.get(
+                                            "IsEncrypted", False
+                                        ),
+                                        backup_vault_region=backup_vault.region,
+                                        region=regional_client.region,
+                                        tags=[],
+                                    )
+                                )
+        except ClientError as error:
+            logger.error(
+                f"{regional_client.region} -- {error.__class__.__name__}[{error.__traceback__.tb_lineno}]: {error}"
+            )
+        except Exception as error:
+            logger.error(
+                f"{regional_client.region} -- {error.__class__.__name__}[{error.__traceback__.tb_lineno}]: {error}"
             )
 
 
@@ -208,3 +247,13 @@ class BackupReportPlan(BaseModel):
     name: str
     last_attempted_execution_date: Optional[datetime]
     last_successful_execution_date: Optional[datetime]
+
+
+class RecoveryPoint(BaseModel):
+    arn: str
+    id: str
+    region: str
+    backup_vault_name: str
+    encrypted: bool
+    backup_vault_region: str
+    tags: Optional[list]
