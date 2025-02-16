@@ -1,9 +1,17 @@
+from allauth.socialaccount.providers.github.views import GitHubOAuth2Adapter
+from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
 from celery.result import AsyncResult
+from config.settings.social_login import (
+    GITHUB_OAUTH_CALLBACK_URL,
+    GOOGLE_OAUTH_CALLBACK_URL,
+)
+from dj_rest_auth.registration.views import SocialLoginView
 from django.conf import settings as django_settings
 from django.contrib.postgres.aggregates import ArrayAgg
 from django.contrib.postgres.search import SearchQuery
 from django.db import transaction
 from django.db.models import Count, F, OuterRef, Prefetch, Q, Subquery, Sum
+from django.db.models.functions import Coalesce
 from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_control
@@ -73,7 +81,6 @@ from api.models import (
     ScanSummary,
     SeverityChoices,
     StateChoices,
-    StatusChoices,
     Task,
     User,
     UserRoleRelationship,
@@ -81,12 +88,13 @@ from api.models import (
 from api.pagination import ComplianceOverviewPagination
 from api.rbac.permissions import Permissions, get_providers, get_role
 from api.rls import Tenant
-from api.utils import validate_invitation
+from api.utils import CustomOAuth2Client, validate_invitation
 from api.uuid_utils import datetime_to_uuid7
 from api.v1.serializers import (
     ComplianceOverviewFullSerializer,
     ComplianceOverviewSerializer,
     FindingDynamicFilterSerializer,
+    FindingMetadataSerializer,
     FindingSerializer,
     InvitationAcceptSerializer,
     InvitationCreateSerializer,
@@ -120,6 +128,8 @@ from api.v1.serializers import (
     TenantSerializer,
     TokenRefreshSerializer,
     TokenSerializer,
+    TokenSocialLoginSerializer,
+    TokenSwitchTenantSerializer,
     UserCreateSerializer,
     UserRoleRelationshipSerializer,
     UserSerializer,
@@ -186,13 +196,43 @@ class CustomTokenRefreshView(GenericAPIView):
         )
 
 
+@extend_schema(
+    tags=["Token"],
+    summary="Switch tenant using a valid tenant ID",
+    description="Switch tenant by providing a valid tenant ID. The authenticated user must belong to the tenant.",
+)
+class CustomTokenSwitchTenantView(GenericAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    resource_name = "tokens-switch-tenant"
+    serializer_class = TokenSwitchTenantSerializer
+    http_method_names = ["post"]
+
+    def post(self, request):
+        serializer = TokenSwitchTenantSerializer(
+            data=request.data, context={"request": request}
+        )
+
+        try:
+            serializer.is_valid(raise_exception=True)
+        except TokenError as e:
+            raise InvalidToken(e.args[0])
+
+        return Response(
+            data={
+                "type": "tokens-switch-tenant",
+                "attributes": serializer.validated_data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
 @extend_schema(exclude=True)
 class SchemaView(SpectacularAPIView):
     serializer_class = None
 
     def get(self, request, *args, **kwargs):
         spectacular_settings.TITLE = "Prowler API"
-        spectacular_settings.VERSION = "1.1.1"
+        spectacular_settings.VERSION = "1.5.0"
         spectacular_settings.DESCRIPTION = (
             "Prowler API specification.\n\nThis file is auto-generated."
         )
@@ -252,6 +292,58 @@ class SchemaView(SpectacularAPIView):
         return super().get(request, *args, **kwargs)
 
 
+@extend_schema(exclude=True)
+class GoogleSocialLoginView(SocialLoginView):
+    adapter_class = GoogleOAuth2Adapter
+    client_class = CustomOAuth2Client
+    callback_url = GOOGLE_OAUTH_CALLBACK_URL
+
+    def get_response(self):
+        original_response = super().get_response()
+
+        if self.user and self.user.is_authenticated:
+            serializer = TokenSocialLoginSerializer(data={"email": self.user.email})
+            try:
+                serializer.is_valid(raise_exception=True)
+            except TokenError as e:
+                raise InvalidToken(e.args[0])
+            return Response(
+                data={
+                    "type": "google-social-tokens",
+                    "attributes": serializer.validated_data,
+                },
+                status=status.HTTP_200_OK,
+            )
+        return original_response
+
+
+@extend_schema(exclude=True)
+class GithubSocialLoginView(SocialLoginView):
+    adapter_class = GitHubOAuth2Adapter
+    client_class = CustomOAuth2Client
+    callback_url = GITHUB_OAUTH_CALLBACK_URL
+
+    def get_response(self):
+        original_response = super().get_response()
+
+        if self.user and self.user.is_authenticated:
+            serializer = TokenSocialLoginSerializer(data={"email": self.user.email})
+
+            try:
+                serializer.is_valid(raise_exception=True)
+            except TokenError as e:
+                raise InvalidToken(e.args[0])
+
+            return Response(
+                data={
+                    "type": "github-social-tokens",
+                    "attributes": serializer.validated_data,
+                },
+                status=status.HTTP_200_OK,
+            )
+        return original_response
+
+
 @extend_schema_view(
     list=extend_schema(
         tags=["User"],
@@ -275,8 +367,8 @@ class SchemaView(SpectacularAPIView):
     ),
     destroy=extend_schema(
         tags=["User"],
-        summary="Delete a user account",
-        description="Remove a user account from the system.",
+        summary="Delete the user account",
+        description="Remove the current user account from the system.",
     ),
     me=extend_schema(
         tags=["User"],
@@ -309,7 +401,12 @@ class UserViewSet(BaseUserViewset):
         # If called during schema generation, return an empty queryset
         if getattr(self, "swagger_fake_view", False):
             return User.objects.none()
-        return User.objects.filter(membership__tenant__id=self.request.tenant_id)
+        queryset = (
+            User.objects.filter(membership__tenant__id=self.request.tenant_id)
+            if hasattr(self.request, "tenant_id")
+            else User.objects.all()
+        )
+        return queryset.prefetch_related("memberships", "roles")
 
     def get_permissions(self):
         if self.action == "create":
@@ -334,6 +431,12 @@ class UserViewSet(BaseUserViewset):
             data=serializer.data,
             status=status.HTTP_200_OK,
         )
+
+    def destroy(self, request, *args, **kwargs):
+        if kwargs["pk"] != str(self.request.user.id):
+            raise ValidationError("Only the current user can be deleted.")
+
+        return super().destroy(request, *args, **kwargs)
 
     @extend_schema(
         parameters=[
@@ -452,7 +555,7 @@ class UserRoleRelationshipView(RelationshipView, BaseRLSViewSet):
     required_permissions = [Permissions.MANAGE_USERS]
 
     def get_queryset(self):
-        return User.objects.all()
+        return User.objects.filter(membership__tenant__id=self.request.tenant_id)
 
     def create(self, request, *args, **kwargs):
         user = self.get_object()
@@ -540,7 +643,8 @@ class TenantViewSet(BaseTenantViewset):
     required_permissions = [Permissions.MANAGE_ACCOUNT]
 
     def get_queryset(self):
-        return Tenant.objects.all()
+        queryset = Tenant.objects.filter(membership__user=self.request.user)
+        return queryset.prefetch_related("memberships")
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -600,7 +704,8 @@ class MembershipViewSet(BaseTenantViewset):
 
     def get_queryset(self):
         user = self.request.user
-        return Membership.objects.filter(user_id=user.id)
+        queryset = Membership.objects.filter(user_id=user.id)
+        return queryset.select_related("user", "tenant")
 
 
 @extend_schema_view(
@@ -736,10 +841,10 @@ class ProviderGroupViewSet(BaseRLSViewSet):
         # Check if any of the user's roles have UNLIMITED_VISIBILITY
         if user_roles.unlimited_visibility:
             # User has unlimited visibility, return all provider groups
-            return ProviderGroup.objects.prefetch_related("providers")
+            return ProviderGroup.objects.prefetch_related("providers", "roles")
 
         # Collect provider groups associated with the user's roles
-        return user_roles.provider_groups.all()
+        return user_roles.provider_groups.all().prefetch_related("providers", "roles")
 
     def get_serializer_class(self):
         if self.action == "create":
@@ -790,7 +895,7 @@ class ProviderGroupProvidersRelationshipView(RelationshipView, BaseRLSViewSet):
     required_permissions = [Permissions.MANAGE_PROVIDERS]
 
     def get_queryset(self):
-        return ProviderGroup.objects.all()
+        return ProviderGroup.objects.filter(tenant_id=self.request.tenant_id)
 
     def create(self, request, *args, **kwargs):
         provider_group = self.get_object()
@@ -904,10 +1009,11 @@ class ProviderViewSet(BaseRLSViewSet):
         user_roles = get_role(self.request.user)
         if user_roles.unlimited_visibility:
             # User has unlimited visibility, return all providers
-            return Provider.objects.all()
-
-        # User lacks permission, filter providers based on provider groups associated with the role
-        return get_providers(user_roles)
+            queryset = Provider.objects.filter(tenant_id=self.request.tenant_id)
+        else:
+            # User lacks permission, filter providers based on provider groups associated with the role
+            queryset = get_providers(user_roles)
+        return queryset.select_related("secret").prefetch_related("provider_groups")
 
     def get_serializer_class(self):
         if self.action == "create":
@@ -945,7 +1051,7 @@ class ProviderViewSet(BaseRLSViewSet):
         get_object_or_404(Provider, pk=pk)
         with transaction.atomic():
             task = check_provider_connection_task.delay(
-                provider_id=pk, tenant_id=request.tenant_id
+                provider_id=pk, tenant_id=self.request.tenant_id
             )
         prowler_task = Task.objects.get(id=task.id)
         serializer = TaskSerializer(prowler_task)
@@ -966,7 +1072,7 @@ class ProviderViewSet(BaseRLSViewSet):
 
         with transaction.atomic():
             task = delete_provider_task.delay(
-                provider_id=pk, tenant_id=request.tenant_id
+                provider_id=pk, tenant_id=self.request.tenant_id
             )
         prowler_task = Task.objects.get(id=task.id)
         serializer = TaskSerializer(prowler_task)
@@ -1036,7 +1142,7 @@ class ScanViewSet(BaseRLSViewSet):
         """
         if self.request.method in SAFE_METHODS:
             # No permissions required for GET requests
-            self.required_permissions = [Permissions.MANAGE_PROVIDERS]
+            self.required_permissions = []
         else:
             # Require permission for non-GET requests
             self.required_permissions = [Permissions.MANAGE_SCANS]
@@ -1045,10 +1151,11 @@ class ScanViewSet(BaseRLSViewSet):
         user_roles = get_role(self.request.user)
         if user_roles.unlimited_visibility:
             # User has unlimited visibility, return all scans
-            return Scan.objects.all()
-
-        # User lacks permission, filter providers based on provider groups associated with the role
-        return Scan.objects.filter(provider__in=get_providers(user_roles))
+            queryset = Scan.objects.filter(tenant_id=self.request.tenant_id)
+        else:
+            # User lacks permission, filter providers based on provider groups associated with the role
+            queryset = Scan.objects.filter(provider__in=get_providers(user_roles))
+        return queryset.select_related("provider", "task")
 
     def get_serializer_class(self):
         if self.action == "create":
@@ -1082,14 +1189,14 @@ class ScanViewSet(BaseRLSViewSet):
         with transaction.atomic():
             task = perform_scan_task.apply_async(
                 kwargs={
-                    "tenant_id": request.tenant_id,
+                    "tenant_id": self.request.tenant_id,
                     "scan_id": str(scan.id),
                     "provider_id": str(scan.provider_id),
                     # Disabled for now
                     # checks_to_execute=scan.scanner_args.get("checks_to_execute"),
                 },
                 link=perform_scan_summary_task.si(
-                    tenant_id=request.tenant_id,
+                    tenant_id=self.request.tenant_id,
                     scan_id=str(scan.id),
                 ),
             )
@@ -1145,7 +1252,7 @@ class TaskViewSet(BaseRLSViewSet):
         return Task.objects.annotate(
             name=F("task_runner_task__task_name"),
             state=F("task_runner_task__status"),
-        )
+        ).select_related("task_runner_task")
 
     def destroy(self, request, *args, pk=None, **kwargs):
         task = get_object_or_404(Task, pk=pk)
@@ -1206,17 +1313,20 @@ class ResourceViewSet(BaseRLSViewSet):
         "inserted_at",
         "updated_at",
     ]
-    # RBAC required permissions (implicit -> MANAGE_PROVIDERS enable unlimited visibility or check the visibility of the provider through the provider group)
+    # RBAC required permissions (implicit -> MANAGE_PROVIDERS enable unlimited visibility or check the visibility of
+    # the provider through the provider group)
     required_permissions = []
 
     def get_queryset(self):
         user_roles = get_role(self.request.user)
         if user_roles.unlimited_visibility:
             # User has unlimited visibility, return all scans
-            queryset = Resource.objects.all()
+            queryset = Resource.objects.filter(tenant_id=self.request.tenant_id)
         else:
             # User lacks permission, filter providers based on provider groups associated with the role
-            queryset = Resource.objects.filter(provider__in=get_providers(user_roles))
+            queryset = Resource.objects.filter(
+                tenant_id=self.request.tenant_id, provider__in=get_providers(user_roles)
+            )
 
         search_value = self.request.query_params.get("filter[search]", None)
         if search_value:
@@ -1252,6 +1362,14 @@ class ResourceViewSet(BaseRLSViewSet):
         tags=["Finding"],
         summary="List all findings",
         description="Retrieve a list of all findings with options for filtering by various criteria.",
+        parameters=[
+            OpenApiParameter(
+                name="filter[inserted_at]",
+                description="At least one of the variations of the `filter[inserted_at]` filter must be provided.",
+                required=True,
+                type=OpenApiTypes.DATE,
+            )
+        ],
     ),
     retrieve=extend_schema(
         tags=["Finding"],
@@ -1262,7 +1380,21 @@ class ResourceViewSet(BaseRLSViewSet):
         tags=["Finding"],
         summary="Retrieve the services and regions that are impacted by findings",
         description="Fetch services and regions affected in findings.",
-        responses={201: OpenApiResponse(response=MembershipSerializer)},
+        filters=True,
+        deprecated=True,
+    ),
+    metadata=extend_schema(
+        tags=["Finding"],
+        summary="Retrieve metadata values from findings",
+        description="Fetch unique metadata values from a set of findings. This is useful for dynamic filtering.",
+        parameters=[
+            OpenApiParameter(
+                name="filter[inserted_at]",
+                description="At least one of the variations of the `filter[inserted_at]` filter must be provided.",
+                required=True,
+                type=OpenApiTypes.DATE,
+            )
+        ],
         filters=True,
     ),
 )
@@ -1280,21 +1412,23 @@ class FindingViewSet(BaseRLSViewSet):
     }
     http_method_names = ["get"]
     filterset_class = FindingFilter
-    ordering = ["-id"]
+    ordering = ["-inserted_at"]
     ordering_fields = [
-        "id",
         "status",
         "severity",
         "check_id",
         "inserted_at",
         "updated_at",
     ]
-    # RBAC required permissions (implicit -> MANAGE_PROVIDERS enable unlimited visibility or check the visibility of the provider through the provider group)
+    # RBAC required permissions (implicit -> MANAGE_PROVIDERS enable unlimited visibility or check the visibility of
+    # the provider through the provider group)
     required_permissions = []
 
     def get_serializer_class(self):
         if self.action == "findings_services_regions":
             return FindingDynamicFilterSerializer
+        elif self.action == "metadata":
+            return FindingMetadataSerializer
 
         return super().get_serializer_class()
 
@@ -1302,7 +1436,7 @@ class FindingViewSet(BaseRLSViewSet):
         user_roles = get_role(self.request.user)
         if user_roles.unlimited_visibility:
             # User has unlimited visibility, return all scans
-            queryset = Finding.objects.all()
+            queryset = Finding.objects.filter(tenant_id=self.request.tenant_id)
         else:
             # User lacks permission, filter providers based on provider groups associated with the role
             queryset = Finding.objects.filter(
@@ -1337,6 +1471,12 @@ class FindingViewSet(BaseRLSViewSet):
 
         return queryset
 
+    def filter_queryset(self, queryset):
+        # Do not apply filters when retrieving specific finding
+        if self.action == "retrieve":
+            return queryset
+        return super().filter_queryset(queryset)
+
     def inserted_at_to_uuidv7(self, inserted_at):
         if inserted_at is None:
             return None
@@ -1362,6 +1502,38 @@ class FindingViewSet(BaseRLSViewSet):
         serializer.is_valid(raise_exception=True)
 
         return Response(data=serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["get"], url_name="metadata")
+    def metadata(self, request):
+        tenant_id = self.request.tenant_id
+        queryset = self.get_queryset()
+        filtered_queryset = self.filter_queryset(queryset)
+
+        filtered_ids = filtered_queryset.order_by().values("id")
+
+        relevant_resources = Resource.all_objects.filter(
+            tenant_id=tenant_id, findings__id__in=Subquery(filtered_ids)
+        ).only("service", "region", "type")
+
+        aggregation = relevant_resources.aggregate(
+            services=ArrayAgg("service", flat=True),
+            regions=ArrayAgg("region", flat=True),
+            resource_types=ArrayAgg("type", flat=True),
+        )
+
+        services = sorted(set(aggregation["services"] or []))
+        regions = sorted({region for region in aggregation["regions"] or [] if region})
+        resource_types = sorted(set(aggregation["resource_types"] or []))
+
+        result = {
+            "services": services,
+            "regions": regions,
+            "resource_types": resource_types,
+        }
+
+        serializer = self.get_serializer(data=result)
+        serializer.is_valid(raise_exception=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 @extend_schema_view(
@@ -1409,7 +1581,7 @@ class ProviderSecretViewSet(BaseRLSViewSet):
     required_permissions = [Permissions.MANAGE_PROVIDERS]
 
     def get_queryset(self):
-        return ProviderSecret.objects.all()
+        return ProviderSecret.objects.filter(tenant_id=self.request.tenant_id)
 
     def get_serializer_class(self):
         if self.action == "create":
@@ -1468,7 +1640,7 @@ class InvitationViewSet(BaseRLSViewSet):
     required_permissions = [Permissions.MANAGE_ACCOUNT]
 
     def get_queryset(self):
-        return Invitation.objects.all()
+        return Invitation.objects.filter(tenant_id=self.request.tenant_id)
 
     def get_serializer_class(self):
         if self.action == "create":
@@ -1515,7 +1687,7 @@ class InvitationAcceptViewSet(BaseRLSViewSet):
     http_method_names = ["post"]
 
     def get_queryset(self):
-        return Invitation.objects.all()
+        return Invitation.objects.filter(tenant_id=self.request.tenant_id)
 
     def get_serializer_class(self):
         if hasattr(self, "response_serializer_class"):
@@ -1607,7 +1779,7 @@ class RoleViewSet(BaseRLSViewSet):
     required_permissions = [Permissions.MANAGE_ACCOUNT]
 
     def get_queryset(self):
-        return Role.objects.all()
+        return Role.objects.filter(tenant_id=self.request.tenant_id)
 
     def get_serializer_class(self):
         if self.action == "create":
@@ -1623,12 +1795,22 @@ class RoleViewSet(BaseRLSViewSet):
             request.data["manage_account"] = str(user_role.manage_account).lower()
         return super().partial_update(request, *args, **kwargs)
 
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if (
+            instance.name == "admin"
+        ):  # TODO: Move to a constant/enum (in case other roles are created by default)
+            raise ValidationError(detail="The admin role cannot be deleted.")
+
+        return super().destroy(request, *args, **kwargs)
+
 
 @extend_schema_view(
     create=extend_schema(
         tags=["Role"],
         summary="Create a new role-provider_groups relationship",
-        description="Add a new role-provider_groups relationship to the system by providing the required role-provider_groups details.",
+        description="Add a new role-provider_groups relationship to the system by providing the required "
+        "role-provider_groups details.",
         responses={
             204: OpenApiResponse(description="Relationship created successfully"),
             400: OpenApiResponse(
@@ -1667,7 +1849,7 @@ class RoleProviderGroupRelationshipView(RelationshipView, BaseRLSViewSet):
     required_permissions = [Permissions.MANAGE_ACCOUNT]
 
     def get_queryset(self):
-        return Role.objects.all()
+        return Role.objects.filter(tenant_id=self.request.tenant_id)
 
     def create(self, request, *args, **kwargs):
         role = self.get_object()
@@ -1750,7 +1932,8 @@ class ComplianceOverviewViewSet(BaseRLSViewSet):
     search_fields = ["compliance_id"]
     ordering = ["compliance_id"]
     ordering_fields = ["inserted_at", "compliance_id", "framework", "region"]
-    # RBAC required permissions (implicit -> MANAGE_PROVIDERS enable unlimited visibility or check the visibility of the provider through the provider group)
+    # RBAC required permissions (implicit -> MANAGE_PROVIDERS enable unlimited visibility or check the visibility of
+    # the provider through the provider group)
     required_permissions = []
 
     def get_queryset(self):
@@ -1761,20 +1944,28 @@ class ComplianceOverviewViewSet(BaseRLSViewSet):
 
         if self.action == "retrieve":
             if unlimited_visibility:
-                # User has unlimited visibility, return all compliance compliances
-                return ComplianceOverview.objects.all()
+                # User has unlimited visibility, return all compliance
+                return ComplianceOverview.objects.filter(
+                    tenant_id=self.request.tenant_id
+                )
 
             providers = get_providers(role)
-            return ComplianceOverview.objects.filter(scan__provider__in=providers)
+            return ComplianceOverview.objects.filter(
+                tenant_id=self.request.tenant_id, scan__provider__in=providers
+            )
 
         if unlimited_visibility:
-            base_queryset = self.filter_queryset(ComplianceOverview.objects.all())
+            base_queryset = self.filter_queryset(
+                ComplianceOverview.objects.filter(tenant_id=self.request.tenant_id)
+            )
         else:
             providers = Provider.objects.filter(
                 provider_groups__in=role.provider_groups.all()
             ).distinct()
             base_queryset = self.filter_queryset(
-                ComplianceOverview.objects.filter(scan__provider__in=providers)
+                ComplianceOverview.objects.filter(
+                    tenant_id=self.request.tenant_id, scan__provider__in=providers
+                )
             )
 
         max_failed_ids = (
@@ -1853,7 +2044,8 @@ class OverviewViewSet(BaseRLSViewSet):
     queryset = ComplianceOverview.objects.all()
     http_method_names = ["get"]
     ordering = ["-id"]
-    # RBAC required permissions (implicit -> MANAGE_PROVIDERS enable unlimited visibility or check the visibility of the provider through the provider group)
+    # RBAC required permissions (implicit -> MANAGE_PROVIDERS enable unlimited visibility or check the visibility of
+    # the provider through the provider group)
     required_permissions = []
 
     def get_queryset(self):
@@ -1862,8 +2054,10 @@ class OverviewViewSet(BaseRLSViewSet):
 
         def _get_filtered_queryset(model):
             if role.unlimited_visibility:
-                return model.objects.all()
-            return model.objects.filter(scan__provider__in=providers)
+                return model.objects.filter(tenant_id=self.request.tenant_id)
+            return model.objects.filter(
+                tenant_id=self.request.tenant_id, scan__provider__in=providers
+            )
 
         if self.action == "providers":
             return _get_filtered_queryset(Finding)
@@ -1902,74 +2096,69 @@ class OverviewViewSet(BaseRLSViewSet):
 
     @action(detail=False, methods=["get"], url_name="providers")
     def providers(self, request):
-        # Subquery to get the most recent finding for each uid
-        latest_finding_ids = (
-            Finding.objects.filter(
-                uid=OuterRef("uid"), scan__provider=OuterRef("scan__provider")
+        tenant_id = self.request.tenant_id
+
+        latest_scan_ids = (
+            Scan.objects.filter(
+                tenant_id=tenant_id,
+                state=StateChoices.COMPLETED,
             )
-            .order_by("-id")  # Most recent by id
-            .values("id")[:1]
+            .order_by("provider_id", "-inserted_at")
+            .distinct("provider_id")
+            .values_list("id", flat=True)
         )
 
-        # Filter findings to only include the most recent for each uid
-        recent_findings = Finding.objects.filter(id__in=Subquery(latest_finding_ids))
-
-        # Aggregate findings by provider
         findings_aggregated = (
-            recent_findings.values("scan__provider__provider")
+            ScanSummary.objects.filter(tenant_id=tenant_id, scan_id__in=latest_scan_ids)
+            .values("scan__provider__provider")
             .annotate(
-                findings_passed=Count("id", filter=Q(status=StatusChoices.PASS.value)),
-                findings_failed=Count("id", filter=Q(status=StatusChoices.FAIL.value)),
-                findings_manual=Count(
-                    "id", filter=Q(status=StatusChoices.MANUAL.value)
-                ),
-                total_findings=Count("id"),
+                findings_passed=Coalesce(Sum("_pass"), 0),
+                findings_failed=Coalesce(Sum("fail"), 0),
+                findings_muted=Coalesce(Sum("muted"), 0),
+                total_findings=Coalesce(Sum("total"), 0),
             )
-            .order_by("-findings_failed")
         )
 
-        # Aggregate total resources by provider
-        resources_aggregated = Resource.objects.values("provider__provider").annotate(
-            total_resources=Count("id")
+        resources_aggregated = (
+            Resource.objects.filter(tenant_id=tenant_id)
+            .values("provider__provider")
+            .annotate(total_resources=Count("id"))
         )
+        resources_dict = {
+            row["provider__provider"]: row["total_resources"]
+            for row in resources_aggregated
+        }
 
-        # Combine findings and resources data
         overview = []
-        for findings in findings_aggregated:
-            provider = findings["scan__provider__provider"]
-            total_resources = next(
-                (
-                    res["total_resources"]
-                    for res in resources_aggregated
-                    if res["provider__provider"] == provider
-                ),
-                0,
-            )
+        for row in findings_aggregated:
+            provider_type = row["scan__provider__provider"]
             overview.append(
                 {
-                    "provider": provider,
-                    "total_resources": total_resources,
-                    "total_findings": findings["total_findings"],
-                    "findings_passed": findings["findings_passed"],
-                    "findings_failed": findings["findings_failed"],
-                    "findings_manual": findings["findings_manual"],
+                    "provider": provider_type,
+                    "total_resources": resources_dict.get(provider_type, 0),
+                    "total_findings": row["total_findings"],
+                    "findings_passed": row["findings_passed"],
+                    "findings_failed": row["findings_failed"],
+                    "findings_muted": row["findings_muted"],
                 }
             )
 
         serializer = OverviewProviderSerializer(overview, many=True)
-
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["get"], url_name="findings")
     def findings(self, request):
+        tenant_id = self.request.tenant_id
         queryset = self.get_queryset()
         filtered_queryset = self.filter_queryset(queryset)
 
         latest_scan_subquery = (
             Scan.objects.filter(
-                state=StateChoices.COMPLETED, provider_id=OuterRef("scan__provider_id")
+                tenant_id=tenant_id,
+                state=StateChoices.COMPLETED,
+                provider_id=OuterRef("scan__provider_id"),
             )
-            .order_by("-id")
+            .order_by("-inserted_at")
             .values("id")[:1]
         )
 
@@ -2004,14 +2193,17 @@ class OverviewViewSet(BaseRLSViewSet):
 
     @action(detail=False, methods=["get"], url_name="findings_severity")
     def findings_severity(self, request):
+        tenant_id = self.request.tenant_id
         queryset = self.get_queryset()
         filtered_queryset = self.filter_queryset(queryset)
 
         latest_scan_subquery = (
             Scan.objects.filter(
-                state=StateChoices.COMPLETED, provider_id=OuterRef("scan__provider_id")
+                tenant_id=tenant_id,
+                state=StateChoices.COMPLETED,
+                provider_id=OuterRef("scan__provider_id"),
             )
-            .order_by("-id")
+            .order_by("-inserted_at")
             .values("id")[:1]
         )
 
@@ -2037,14 +2229,17 @@ class OverviewViewSet(BaseRLSViewSet):
 
     @action(detail=False, methods=["get"], url_name="services")
     def services(self, request):
+        tenant_id = self.request.tenant_id
         queryset = self.get_queryset()
         filtered_queryset = self.filter_queryset(queryset)
 
         latest_scan_subquery = (
             Scan.objects.filter(
-                state=StateChoices.COMPLETED, provider_id=OuterRef("scan__provider_id")
+                tenant_id=tenant_id,
+                state=StateChoices.COMPLETED,
+                provider_id=OuterRef("scan__provider_id"),
             )
-            .order_by("-id")
+            .order_by("-inserted_at")
             .values("id")[:1]
         )
 

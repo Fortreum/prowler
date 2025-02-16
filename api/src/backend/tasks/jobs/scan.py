@@ -152,6 +152,9 @@ def perform_prowler_scan(
 
         for progress, findings in prowler_scan.scan():
             for finding in findings:
+                if finding is None:
+                    logger.error(f"None finding detected on scan {scan_id}.")
+                    continue
                 for attempt in range(CELERY_DEADLOCK_ATTEMPTS):
                     try:
                         with rls_transaction(tenant_id):
@@ -176,7 +179,10 @@ def perform_prowler_scan(
 
                         # Update resource fields if necessary
                         updated_fields = []
-                        if resource_instance.region != finding.region:
+                        if (
+                            finding.region
+                            and resource_instance.region != finding.region
+                        ):
                             resource_instance.region = finding.region
                             updated_fields.append("region")
                         if resource_instance.service != finding.service_name:
@@ -219,24 +225,33 @@ def perform_prowler_scan(
                 # Process finding
                 with rls_transaction(tenant_id):
                     finding_uid = finding.uid
+                    last_first_seen_at = None
                     if finding_uid not in last_status_cache:
                         most_recent_finding = (
-                            Finding.objects.filter(uid=finding_uid)
-                            .order_by("-id")
-                            .values("status")
+                            Finding.all_objects.filter(
+                                tenant_id=tenant_id, uid=finding_uid
+                            )
+                            .order_by("-inserted_at")
+                            .values("status", "first_seen_at")
                             .first()
                         )
-                        last_status = (
-                            most_recent_finding["status"]
-                            if most_recent_finding
-                            else None
-                        )
-                        last_status_cache[finding_uid] = last_status
+                        last_status = None
+                        if most_recent_finding:
+                            last_status = most_recent_finding["status"]
+                            last_first_seen_at = most_recent_finding["first_seen_at"]
+                        last_status_cache[finding_uid] = last_status, last_first_seen_at
                     else:
-                        last_status = last_status_cache[finding_uid]
+                        last_status, last_first_seen_at = last_status_cache[finding_uid]
 
                     status = FindingStatus[finding.status]
                     delta = _create_finding_delta(last_status, status)
+                    # For the findings prior to the change, when a first finding is found with delta!="new" it will be
+                    # assigned a current date as first_seen_at and the successive findings with the same UID will
+                    # always get the date of the previous finding.
+                    # For new findings, when a finding (delta="new") is found for the first time, the first_seen_at
+                    # attribute will be assigned the current date, the following findings will get that date.
+                    if not last_first_seen_at:
+                        last_first_seen_at = datetime.now(tz=timezone.utc)
 
                     # Create the finding
                     finding_instance = Finding.objects.create(
@@ -251,6 +266,7 @@ def perform_prowler_scan(
                         raw_result=finding.raw,
                         check_id=finding.check_id,
                         scan=scan_instance,
+                        first_seen_at=last_first_seen_at,
                     )
                     finding_instance.add_resources([resource_instance])
 
@@ -367,7 +383,7 @@ def aggregate_findings(tenant_id: str, scan_id: str):
         - muted_changed: Muted findings with a delta of 'changed'.
     """
     with rls_transaction(tenant_id):
-        findings = Finding.objects.filter(scan_id=scan_id)
+        findings = Finding.objects.filter(tenant_id=tenant_id, scan_id=scan_id)
 
         aggregation = findings.values(
             "check_id",

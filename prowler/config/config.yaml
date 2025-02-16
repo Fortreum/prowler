@@ -73,6 +73,10 @@ aws:
   # aws.cloudwatch_log_group_retention_policy_specific_days_enabled --> by default is 365 days
   log_group_retention_days: 365
 
+  # AWS CloudFormation Configuration
+  # cloudformation_stack_cdktoolkit_bootstrap_version --> by default is 21
+  recommended_cdk_bootstrap_version: 21
+
   # AWS AppStream Session Configuration
   # aws.appstream_fleet_session_idle_disconnect_timeout
   max_idle_disconnect_timeout_in_seconds: 600 # 10 Minutes
@@ -373,6 +377,37 @@ aws:
   # AWS Kinesis Configuration
   # Minimum retention period in hours for Kinesis streams
   min_kinesis_stream_retention_hours: 168 # 7 days
+
+  # Detect Secrets plugin configuration
+  detect_secrets_plugins: [
+    {"name": "ArtifactoryDetector"},
+    {"name": "AWSKeyDetector"},
+    {"name": "AzureStorageKeyDetector"},
+    {"name": "BasicAuthDetector"},
+    {"name": "CloudantDetector"},
+    {"name": "DiscordBotTokenDetector"},
+    {"name": "GitHubTokenDetector"},
+    {"name": "GitLabTokenDetector"},
+    {"name": "Base64HighEntropyString", "limit": 6.0},
+    {"name": "HexHighEntropyString", "limit": 3.0},
+    {"name": "IbmCloudIamDetector"},
+    {"name": "IbmCosHmacDetector"},
+    # {"name": "IPPublicDetector"}, https://github.com/Yelp/detect-secrets/pull/885
+    {"name": "JwtTokenDetector"},
+    {"name": "KeywordDetector"},
+    {"name": "MailchimpDetector"},
+    {"name": "NpmDetector"},
+    {"name": "OpenAIDetector"},
+    {"name": "PrivateKeyDetector"},
+    {"name": "PypiTokenDetector"},
+    {"name": "SendGridDetector"},
+    {"name": "SlackDetector"},
+    {"name": "SoftlayerDetector"},
+    {"name": "SquareOAuthDetector"},
+    {"name": "StripeDetector"},
+    # {"name": "TelegramBotTokenDetector"}, https://github.com/Yelp/detect-secrets/pull/878
+    {"name": "TwilioKeyDetector"},
+  ]
 
 
 # Azure Configuration
