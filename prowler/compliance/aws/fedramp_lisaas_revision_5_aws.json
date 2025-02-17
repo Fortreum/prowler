@@ -1,8 +1,8 @@
 {
-  "Framework": "NIST-800-53-Revision-5",
+  "Framework": "FedRAMP-LiSaaS-Revision-5",
   "Version": "",
   "Provider": "AWS",
-  "Description": "The NIST 800-53 (Rev. 5) Low-Moderate-High framework represents the security controls and the associated assessment procedures that are defined in NIST SP 800-53 Revision 5 Recommended Security Controls for Federal Information Systems and Organizations. For any discrepancies that are noted in the content between this NIST SP 800-53 framework and the latest published NIST Special Publication SP 800-53 Revision 5, refer to the official published documents that are available at the NIST Computer Security Resource Center.",
+  "Description": "The Federal Risk and Authorization Management Program (FedRAMP) was established in 2011. It provides a cost-effective, risk-based approach for the adoption and use of cloud services by the U.S. federal government. FedRAMP empowers federal agencies to use modern cloud technologies, with an emphasis on the security and protection of federal information.",
   "Requirements": [
     {
       "Id": "ac_2_1",
