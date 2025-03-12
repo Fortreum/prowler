@@ -1,8 +1,8 @@
 {
-  "Framework": "FedRamp-Moderate-Revision-5",
-  "Version": "",
+  "Framework": "FedRAMP-Moderate-Revision-5",
+  "Version": "5.0",
   "Provider": "AWS",
-  "Description": "The Federal Risk and Authorization Management Program (FedRAMP) was established in 2011. It provides a cost-effective, risk-based approach for the adoption and use of cloud services by the U.S. federal government. FedRAMP empowers federal agencies to use modern cloud technologies, with an emphasis on the security and protection of federal information.",
+  "Description": "The Federal Risk and Authorization Management Program (FedRAMP) was established in 2011. It provides a cost-effective, risk-based approach for the adoption and use of cloud services by the U.S. federal government. FedRAMP empowers federal agencies to use modern cloud technologies, with an emphasis on the security and protection of federal information. This framework covers the controls for FedRAMP Moderate Revision 5 based on NIST SP 800-53 Revision 5.",
   "Requirements": [
     {
       "Id": "ac-2-1",
@@ -28,7 +28,6 @@
         "iam_no_root_access_key",
         "iam_rotate_access_key_90_days",
         "iam_user_mfa_enabled_console_access",
-        "iam_user_mfa_enabled_console_access",
         "iam_user_accesskey_unused",
         "iam_user_console_access_unused",
         "securityhub_enabled"
@@ -50,7 +49,6 @@
         "cloudtrail_multi_region_enabled",
         "cloudtrail_s3_dataevents_read_enabled",
         "cloudtrail_s3_dataevents_write_enabled",
-        "cloudtrail_multi_region_enabled",
         "cloudtrail_cloudwatch_logging_enabled",
         "cloudwatch_changes_to_network_acls_alarm_configured",
         "cloudwatch_changes_to_network_gateways_alarm_configured",
@@ -81,6 +79,27 @@
       ]
     },
     {
+      "Id": "ac-2-d",
+      "Name": "AC-2(d)",
+      "Description": "Notify account managers of user account changes including terminations, transfers, or role changes.",
+      "Attributes": [
+        {
+          "ItemId": "ac-2-d",
+          "Section": "Access Control (AC)",
+          "SubSection": "Account Management (AC-2)",
+          "Service": "aws"
+        }
+      ],
+      "Checks": [
+        "cloudtrail_cloudwatch_logging_enabled",
+        "cloudwatch_log_group_retention_policy_specific_days_enabled",
+        "eventbridge_rules_exists",
+        "account_security_contact_information_is_registered",
+        "iam_user_accesskey_unused",
+        "iam_user_console_access_unused"
+      ]
+    },
+    {
       "Id": "ac-2-f",
       "Name": "AC-2(f)",
       "Description": "The organization: f. Creates, enables, modifies, disables, and removes information system accounts in accordance with [Assignment: organization-defined procedures or conditions].",
@@ -102,7 +121,6 @@
         "iam_root_mfa_enabled",
         "iam_no_root_access_key",
         "iam_rotate_access_key_90_days",
-        "iam_user_mfa_enabled_console_access",
         "iam_user_mfa_enabled_console_access",
         "iam_user_accesskey_unused",
         "iam_user_console_access_unused"
@@ -157,15 +175,32 @@
         "iam_no_root_access_key",
         "iam_rotate_access_key_90_days",
         "iam_user_mfa_enabled_console_access",
-        "iam_user_mfa_enabled_console_access",
         "iam_user_accesskey_unused",
         "iam_user_console_access_unused"
       ]
     },
     {
+      "Id": "ac-2-2",
+      "Name": "AC-2(2) Temporary and Emergency Account Management",
+      "Description": "Automatically disable temporary and emergency accounts after a defined time period.",
+      "Attributes": [
+        {
+          "ItemId": "ac-2-2",
+          "Section": "Access Control (AC)",
+          "SubSection": "Account Management (AC-2)",
+          "Service": "aws"
+        }
+      ],
+      "Checks": [
+        "iam_user_accesskey_unused",
+        "iam_user_console_access_unused",
+        "iam_user_with_temporary_credentials"
+      ]
+    },
+    {
       "Id": "ac-2-3",
-      "Name": "AC-2-3",
-      "Description": "The information system automatically disables inactive accounts after 90 days for user accounts.",
+      "Name": "AC-2(3) Disable Accounts",
+      "Description": "Automatically disable inactive accounts after 90 days for user accounts.",
       "Attributes": [
         {
           "ItemId": "ac-2-3",
@@ -178,6 +213,63 @@
         "iam_password_policy_minimum_length_14",
         "iam_user_accesskey_unused",
         "iam_user_console_access_unused"
+      ]
+    },
+    {
+      "Id": "ac-2-3-c",
+      "Name": "AC-2(3)(c) Monitor Shared/Group Account Usage",
+      "Description": "Monitor the use of shared/group accounts.",
+      "Attributes": [
+        {
+          "ItemId": "ac-2-3-c",
+          "Section": "Access Control (AC)",
+          "SubSection": "Account Management (AC-2)",
+          "Service": "aws"
+        }
+      ],
+      "Checks": [
+        "cloudtrail_multi_region_enabled",
+        "cloudtrail_cloudwatch_logging_enabled",
+        "iam_policy_attached_only_to_group_or_roles",
+        "cloudwatch_log_group_retention_policy_specific_days_enabled"
+      ]
+    },
+    {
+      "Id": "ac-2-7-a",
+      "Name": "AC-2(7)(a) Account Credential Reissuance",
+      "Description": "Establish and follow a process for reissuing shared/group account credentials when individuals are removed from the group.",
+      "Attributes": [
+        {
+          "ItemId": "ac-2-7-a",
+          "Section": "Access Control (AC)",
+          "SubSection": "Account Management (AC-2)",
+          "Service": "aws"
+        }
+      ],
+      "Checks": [
+        "iam_rotate_access_key_90_days",
+        "secretsmanager_automatic_rotation_enabled",
+        "iam_user_accesskey_unused"
+      ]
+    },
+    {
+      "Id": "ac-2-7-c",
+      "Name": "AC-2(7)(c) Password Hashing",
+      "Description": "Store passwords using hashing with a salt.",
+      "Attributes": [
+        {
+          "ItemId": "ac-2-7-c",
+          "Section": "Access Control (AC)",
+          "SubSection": "Account Management (AC-2)",
+          "Service": "aws"
+        }
+      ],
+      "Checks": [
+        "iam_password_policy_minimum_length_14",
+        "iam_password_policy_number",
+        "iam_password_policy_symbol",
+        "iam_password_policy_uppercase",
+        "iam_password_policy_lowercase"
       ]
     },
     {
@@ -246,6 +338,29 @@
       ]
     },
     {
+      "Id": "ac-4-21",
+      "Name": "AC-4(21) Information Flow Enforcement - Automatic Mechanism",
+      "Description": "Employ automated mechanisms to assist in information flow enforcement.",
+      "Attributes": [
+        {
+          "ItemId": "ac-4-21",
+          "Section": "Access Control (AC)",
+          "SubSection": "Information Flow Enforcement (AC-4)",
+          "Service": "aws"
+        }
+      ],
+      "Checks": [
+        "wafv2_webacl_logging_enabled",
+        "shield_advanced_enabled",
+        "networkfirewall_in_all_vpc",
+        "vpc_endpoint_connections_trust_boundaries",
+        "vpc_flow_logs_enabled",
+        "vpc_endpoint_acceptance_required",
+        "elb_ssl_listeners",
+        "s3_bucket_secure_transport_policy"
+      ]
+    },
+    {
       "Id": "ac-5-c",
       "Name": "AC-5(c)",
       "Description": "The organization: c. Defines information system access authorizations to support separation of duties.",
@@ -290,7 +405,7 @@
     {
       "Id": "ac-6",
       "Name": "Least Privilege (AC-6)",
-      "Description": "The organization employs the principle of least privilege, allowing only authorized accesses for users (or processes acting on behalf of users) which are necessary to accomplish assigned tasks in accordance with organizational missions and business functions.",
+      "Description": "Employ the principle of least privilege, allowing only authorized accesses for users (or processes acting on behalf of users) which are necessary to accomplish assigned tasks in accordance with organizational missions and business functions.",
       "Attributes": [
         {
           "ItemId": "ac-6",
@@ -318,7 +433,103 @@
         "s3_bucket_policy_public_write_access",
         "s3_account_level_public_access_blocks",
         "s3_bucket_public_access",
-        "sagemaker_notebook_instance_without_direct_internet_access_configured"
+        "sagemaker_notebook_instance_without_direct_internet_access_configured",
+        "accessanalyzer_enabled",
+        "accessanalyzer_enabled_without_findings",
+        "iam_user_with_temporary_credentials",
+        "iam_no_custom_policy_permissive_role_assumption",
+        "iam_policy_allows_privilege_escalation",
+        "iam_role_cross_service_confused_deputy_prevention"
+      ]
+    },
+    {
+      "Id": "ac-6-2",
+      "Name": "AC-6(2) Non-Privileged Access For Nonsecurity Functions",
+      "Description": "Require that users of system accounts use non-privileged accounts or roles when accessing nonsecurity functions.",
+      "Attributes": [
+        {
+          "ItemId": "ac-6-2",
+          "Section": "Access Control (AC)",
+          "SubSection": "Least Privilege (AC-6)",
+          "Service": "aws"
+        }
+      ],
+      "Checks": [
+        "iam_aws_attached_policy_no_administrative_privileges",
+        "iam_customer_attached_policy_no_administrative_privileges",
+        "iam_inline_policy_no_administrative_privileges",
+        "iam_policy_attached_only_to_group_or_roles",
+        "iam_no_root_access_key",
+        "iam_policy_no_full_access_to_cloudtrail",
+        "iam_policy_no_full_access_to_kms",
+        "iam_role_administratoraccess_policy",
+        "iam_user_administrator_access_policy"
+      ]
+    },
+    {
+      "Id": "ac-6-5",
+      "Name": "AC-6(5) Privileged Accounts",
+      "Description": "Restrict privileged accounts on the system to personnel or roles with security administration responsibilities.",
+      "Attributes": [
+        {
+          "ItemId": "ac-6-5",
+          "Section": "Access Control (AC)",
+          "SubSection": "Least Privilege (AC-6)",
+          "Service": "aws"
+        }
+      ],
+      "Checks": [
+        "iam_aws_attached_policy_no_administrative_privileges",
+        "iam_customer_attached_policy_no_administrative_privileges",
+        "iam_inline_policy_no_administrative_privileges",
+        "iam_policy_attached_only_to_group_or_roles",
+        "iam_no_root_access_key",
+        "iam_policy_no_full_access_to_cloudtrail",
+        "iam_policy_no_full_access_to_kms",
+        "iam_role_administratoraccess_policy",
+        "iam_user_administrator_access_policy",
+        "iam_administrator_access_with_mfa"
+      ]
+    },
+    {
+      "Id": "ac-6-7",
+      "Name": "AC-6(7) Review of User Privileges",
+      "Description": "Review privileges prior to granting privileged access.",
+      "Attributes": [
+        {
+          "ItemId": "ac-6-7",
+          "Section": "Access Control (AC)",
+          "SubSection": "Least Privilege (AC-6)",
+          "Service": "aws"
+        }
+      ],
+      "Checks": [
+        "accessanalyzer_enabled",
+        "accessanalyzer_enabled_without_findings",
+        "iam_user_accesskey_unused",
+        "iam_user_console_access_unused",
+        "iam_rotate_access_key_90_days"
+      ]
+    },
+    {
+      "Id": "ac-6-9",
+      "Name": "AC-6(9) Log Use Of Privileged Functions",
+      "Description": "Log the execution of privileged functions.",
+      "Attributes": [
+        {
+          "ItemId": "ac-6-9",
+          "Section": "Access Control (AC)",
+          "SubSection": "Least Privilege (AC-6)",
+          "Service": "aws"
+        }
+      ],
+      "Checks": [
+        "cloudtrail_multi_region_enabled",
+        "cloudtrail_cloudwatch_logging_enabled",
+        "cloudtrail_s3_dataevents_read_enabled",
+        "cloudtrail_s3_dataevents_write_enabled",
+        "guardduty_is_enabled",
+        "securityhub_enabled"
       ]
     },
     {
@@ -540,7 +751,33 @@
       "Checks": [
         "cloudtrail_kms_encryption_enabled",
         "cloudtrail_log_file_validation_enabled",
-        "cloudwatch_log_group_kms_encryption_enabled"
+        "cloudwatch_log_group_kms_encryption_enabled",
+        "s3_bucket_server_access_logging_enabled",
+        "s3_bucket_policy_public_write_access",
+        "cloudtrail_logs_s3_bucket_is_not_publicly_accessible"
+      ]
+    },
+    {
+      "Id": "au-6-1",
+      "Name": "AU-6(1) Process Integration",
+      "Description": "Integrate audit review, analysis, and reporting processes to support organizational processes for investigation and response to suspicious activities.",
+      "Attributes": [
+        {
+          "ItemId": "au-6-1",
+          "Section": "Audit and Accountability (AU)",
+          "SubSection": "Audit Review, Analysis, and Reporting (AU-6)",
+          "Service": "aws"
+        }
+      ],
+      "Checks": [
+        "guardduty_is_enabled",
+        "securityhub_enabled",
+        "cloudtrail_cloudwatch_logging_enabled",
+        "cloudwatch_changes_to_network_acls_alarm_configured",
+        "cloudwatch_changes_to_network_gateways_alarm_configured",
+        "cloudwatch_changes_to_network_route_tables_alarm_configured",
+        "cloudwatch_changes_to_vpcs_alarm_configured",
+        "ssmincidents_enabled"
       ]
     },
     {
@@ -601,7 +838,6 @@
         "cloudtrail_multi_region_enabled",
         "cloudtrail_s3_dataevents_read_enabled",
         "cloudtrail_s3_dataevents_write_enabled",
-        "cloudtrail_multi_region_enabled",
         "cloudwatch_changes_to_network_acls_alarm_configured",
         "cloudwatch_changes_to_network_gateways_alarm_configured",
         "cloudwatch_changes_to_network_route_tables_alarm_configured",
@@ -610,7 +846,18 @@
         "guardduty_is_enabled",
         "rds_instance_enhanced_monitoring_enabled",
         "redshift_cluster_audit_logging",
-        "securityhub_enabled"
+        "securityhub_enabled",
+        "vpc_endpoint_acceptance_required",
+        "vpc_endpoint_connections_trust_boundaries",
+        "vpc_endpoint_services_allowed_principals_not_wildcard",
+        "accessanalyzer_enabled",
+        "organizations_enabled",
+        "organizations_scp_check_deny_region_outside_home_region",
+        "organizations_delegated_administrators",
+        "organizations_account_part_of_organizations",
+        "account_maintain_current_contact_details",
+        "account_maintain_different_contact_details_to_security_billing_and_operations",
+        "account_security_contact_information_is_registered"
       ]
     },
     {
@@ -647,6 +894,25 @@
         "ec2_networkacl_allow_ingress_any_port",
         "ec2_securitygroup_allow_ingress_from_internet_to_tcp_port_22",
         "ec2_networkacl_allow_ingress_any_port"
+      ]
+    },
+    {
+      "Id": "cm-6",
+      "Name": "Configuration Settings (CM-6)",
+      "Description": "Establish and document configuration settings for components employed within the system that reflect the most restrictive mode consistent with operational requirements.",
+      "Attributes": [
+        {
+          "ItemId": "cm-6",
+          "Section": "Configuration Management (CM)",
+          "Service": "aws"
+        }
+      ],
+      "Checks": [
+        "config_recorder_all_regions_enabled",
+        "config_recorder_using_aws_service_role",
+        "ec2_instance_managed_by_ssm",
+        "ssm_managed_compliant_patching",
+        "securityhub_enabled"
       ]
     },
     {
@@ -716,12 +982,17 @@
       ],
       "Checks": [
         "dynamodb_tables_pitr_enabled",
-        "dynamodb_tables_pitr_enabled",
         "efs_have_backup_enabled",
         "rds_instance_backup_enabled",
-        "rds_instance_backup_enabled",
         "redshift_cluster_automated_snapshot",
-        "s3_bucket_object_versioning"
+        "s3_bucket_object_versioning",
+        "backup_resources_protected_by_backup_plan",
+        "backup_plans_exist",
+        "backup_report_plans_set_monthly",
+        "backup_vaults_encrypted",
+        "ec2_instance_protected_by_backup_plan",
+        "rds_instance_protected_by_backup_plan",
+        "rds_cluster_protected_by_backup_plan"
       ]
     },
     {
@@ -761,7 +1032,6 @@
       ],
       "Checks": [
         "iam_user_mfa_enabled_console_access",
-        "iam_user_mfa_enabled_console_access"
       ]
     },
     {
@@ -810,6 +1080,28 @@
         }
       ],
       "Checks": [
+        "iam_password_policy_minimum_length_14",
+        "iam_password_policy_symbol",
+        "iam_password_policy_uppercase",
+        "iam_password_policy_lowercase",
+        "iam_password_policy_number",
+        "iam_password_policy_reuse_24",
+        "iam_password_policy_expires_passwords_within_90_days_or_less"
+      ]
+    },
+    {
+      "Id": "ia-5-1-b",
+      "Name": "IA-5(1)(b) Minimum Password Length",
+      "Description": "Enforce at least the following number of characters for passwords: 12 characters for privileged accounts and 8 characters for non-privileged accounts.",
+      "Attributes": [
+        {
+          "ItemId": "ia-5-1-b",
+          "Section": "Identification and Authentication (IA)",
+          "SubSection": "IA-5(1) Password-Based Authentication",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
         "iam_password_policy_minimum_length_14"
       ]
     },
@@ -841,34 +1133,18 @@
           "Service": "codebuild"
         }
       ],
-      "Checks": []
-    },
-    {
-      "Id": "ir-4-1",
-      "Name": "IR-4(1) Automated Incident Handling Processes",
-      "Description": "The organization employs automated mechanisms to support the incident handling process.",
-      "Attributes": [
-        {
-          "ItemId": "ir-4-1",
-          "Section": "Incident Response (IR)",
-          "SubSection": "Incident Handling (IR-4)",
-          "Service": "aws"
-        }
-      ],
       "Checks": [
-        "cloudwatch_changes_to_network_acls_alarm_configured",
-        "cloudwatch_changes_to_network_gateways_alarm_configured",
-        "cloudwatch_changes_to_network_route_tables_alarm_configured",
-        "cloudwatch_changes_to_vpcs_alarm_configured",
-        "guardduty_is_enabled",
-        "guardduty_no_high_severity_findings",
-        "securityhub_enabled"
+        "codebuild_project_plaintext_env_variables_no_sensitive_aws",
+        "awslambda_function_no_secrets_in_variables",
+        "secretsmanager_automatic_rotation_enabled",
+        "secretsmanager_using_cmk",
+        "ssm_parameter_store_securestring_encrypted_with_kms_cmk"
       ]
     },
     {
       "Id": "ir-4-1",
       "Name": "IR-4(1) Automated Incident Handling Processes",
-      "Description": "The organization employs automated mechanisms to support the incident handling process.",
+      "Description": "Employ automated mechanisms to support the incident handling process.",
       "Attributes": [
         {
           "ItemId": "ir-4-1",
@@ -931,12 +1207,35 @@
         {
           "ItemId": "ra-5",
           "Section": "Risk Assessment (RA)",
-          "Service": "guarduty"
+          "Service": "aws"
         }
       ],
       "Checks": [
         "guardduty_is_enabled",
-        "guardduty_no_high_severity_findings"
+        "guardduty_no_high_severity_findings",
+        "ec2_instance_managed_by_ssm",
+        "securityhub_enabled",
+        "inspector2_is_enabled",
+        "inspector2_active_findings_exist",
+        "ecr_image_scan_on_push_enabled"
+      ]
+    },
+    {
+      "Id": "ra-5-2",
+      "Name": "RA-5(2) Update Vulnerabilities to Be Scanned",
+      "Description": "Update the system vulnerability monitoring tools before conducting scans and when new vulnerabilities are identified.",
+      "Attributes": [
+        {
+          "ItemId": "ra-5-2",
+          "Section": "Risk Assessment (RA)",
+          "SubSection": "Vulnerability Monitoring (RA-5)",
+          "Service": "aws"
+        }
+      ],
+      "Checks": [
+        "inspector2_is_enabled",
+        "guardduty_is_enabled",
+        "securityhub_enabled"
       ]
     },
     {
@@ -1036,7 +1335,16 @@
         "elbv2_deletion_protection",
         "guardduty_is_enabled",
         "rds_instance_multi_az",
-        "s3_bucket_object_versioning"
+        "s3_bucket_object_versioning",
+        "shield_advanced_enabled",
+        "eks_cluster_control_plane_audit_logging_enabled",
+        "eks_cluster_logging_enabled",
+        "eks_endpoint_public_access",
+        "eks_secrets_encrypted",
+        "awslambda_function_url_cors_policy",
+        "awslambda_function_using_supported_runtimes",
+        "ecr_repositories_scan_on_push_enabled",
+        "ecr_repositories_immutable_tags_enabled"
       ]
     },
     {
@@ -1103,7 +1411,16 @@
         "ec2_securitygroup_default_restrict_traffic",
         "ec2_networkacl_allow_ingress_any_port",
         "ec2_securitygroup_allow_ingress_from_internet_to_tcp_port_22",
-        "ec2_networkacl_allow_ingress_any_port"
+        "ec2_networkacl_allow_ingress_any_port",
+        "shield_advanced_enabled",
+        "wafv2_webacl_logging_enabled",
+        "apigateway_restapi_waf_acl_attached",
+        "vpc_endpoint_services_allowed_principals_not_wildcard",
+        "vpc_endpoint_connections_trust_boundaries",
+        "cloudfront_distributions_waf_enabled",
+        "networkfirewall_in_all_vpc",
+        "guardduty_is_enabled",
+        "accessanalyzer_enabled"
       ]
     },
     {
@@ -1175,7 +1492,19 @@
       "Checks": [
         "s3_bucket_default_encryption",
         "sagemaker_notebook_instance_encryption_enabled",
-        "sns_topics_kms_encryption_at_rest_enabled"
+        "sns_topics_kms_encryption_at_rest_enabled",
+        "kms_cmk_rotation_enabled",
+        "kms_customer_master_keys_encrypted_with_kms",
+        "ec2_ebs_volume_encryption",
+        "efs_encryption_at_rest_enabled",
+        "dynamodb_tables_encrypted_kms",
+        "rds_instance_storage_encrypted",
+        "secrets_manager_using_cmk",
+        "s3_bucket_secure_transport_policy",
+        "cloudfront_distributions_https_enabled",
+        "elb_ssl_listeners",
+        "elbv2_insecure_ssl_ciphers",
+        "elbv2_listeners_with_http"
       ]
     },
     {
@@ -1210,14 +1539,42 @@
       "Checks": [
         "cloudtrail_kms_encryption_enabled",
         "ec2_ebs_volume_encryption",
-        "ec2_ebs_volume_encryption",
         "efs_encryption_at_rest_enabled",
         "opensearch_service_domains_encryption_at_rest_enabled",
         "cloudwatch_log_group_kms_encryption_enabled",
         "rds_instance_storage_encrypted",
-        "rds_instance_storage_encrypted",
         "redshift_cluster_audit_logging",
         "s3_bucket_default_encryption",
+        "sagemaker_notebook_instance_encryption_enabled",
+        "sns_topics_kms_encryption_at_rest_enabled",
+        "macie_is_enabled",
+        "macie_automated_sensitive_data_discovery_enabled",
+        "secretsmanager_using_cmk",
+        "dynamodb_tables_encrypted_kms",
+        "cloudfront_distributions_field_level_encryption_enabled",
+        "kinesis_firehose_delivery_stream_encrypted"
+      ]
+    },
+    {
+      "Id": "sc-28-1",
+      "Name": "SC-28(1) Cryptographic Protection",
+      "Description": "Implement cryptographic mechanisms to prevent unauthorized disclosure and modification of information at rest.",
+      "Attributes": [
+        {
+          "ItemId": "sc-28-1",
+          "Section": "System and Communications Protection (SC)",
+          "SubSection": "Protection of Information at Rest (SC-28)",
+          "Service": "aws"
+        }
+      ],
+      "Checks": [
+        "cloudtrail_kms_encryption_enabled",
+        "ec2_ebs_volume_encryption",
+        "efs_encryption_at_rest_enabled",
+        "opensearch_service_domains_encryption_at_rest_enabled",
+        "cloudwatch_log_group_kms_encryption_enabled",
+        "kms_cmk_rotation_enabled",
+        "rds_instance_storage_encrypted",
         "s3_bucket_default_encryption",
         "sagemaker_notebook_instance_encryption_enabled",
         "sns_topics_kms_encryption_at_rest_enabled"
@@ -1237,8 +1594,143 @@
       ],
       "Checks": [
         "ec2_instance_managed_by_ssm",
-        "ssm_managed_compliant_patching",
         "ssm_managed_compliant_patching"
+      ]
+    },
+    {
+      "Id": "si-3-a",
+      "Name": "SI-3(a) Malicious Code Protection",
+      "Description": "Implement malicious code protection mechanisms at system entry and exit points to detect and eradicate malicious code.",
+      "Attributes": [
+        {
+          "ItemId": "si-3-a",
+          "Section": "System and Information Integrity (SI)",
+          "SubSection": "Malicious Code Protection (SI-3)",
+          "Service": "aws"
+        }
+      ],
+      "Checks": [
+        "guardduty_is_enabled",
+        "guardduty_no_high_severity_findings",
+        "guardduty_s3_protection_enabled",
+        "guardduty_ec2_malware_protection_enabled",
+        "guardduty_lambda_protection_enabled",
+        "securityhub_enabled"
+      ]
+    },
+    {
+      "Id": "si-3-b",
+      "Name": "SI-3(b) Update Malicious Code Protection",
+      "Description": "Update malicious code protection mechanisms whenever new releases are available.",
+      "Attributes": [
+        {
+          "ItemId": "si-3-b",
+          "Section": "System and Information Integrity (SI)",
+          "SubSection": "Malicious Code Protection (SI-3)",
+          "Service": "aws"
+        }
+      ],
+      "Checks": [
+        "guardduty_is_enabled",
+        "securityhub_enabled",
+        "inspector2_is_enabled"
+      ]
+    },
+    {
+      "Id": "si-4-5",
+      "Name": "SI-4(5) System-Generated Alerts - Unauthorized Software",
+      "Description": "Employ automated mechanisms to detect the presence of unauthorized software on organizational information systems and notify designated organizational officials.",
+      "Attributes": [
+        {
+          "ItemId": "si-4-5",
+          "Section": "System and Information Integrity (SI)",
+          "SubSection": "Information System Monitoring (SI-4)",
+          "Service": "aws"
+        }
+      ],
+      "Checks": [
+        "inspector2_is_enabled",
+        "guardduty_is_enabled",
+        "ssm_managed_compliant_patching",
+        "ec2_instance_managed_by_ssm",
+        "securityhub_enabled"
+      ]
+    },
+    {
+      "Id": "si-6-a",
+      "Name": "SI-6(a) Software, Firmware, and Information Integrity - Verify Integrity",
+      "Description": "Verify software, firmware, and information integrity weekly using tools, techniques, and/or mechanisms with a verifiable audit trail.",
+      "Attributes": [
+        {
+          "ItemId": "si-6-a",
+          "Section": "System and Information Integrity (SI)",
+          "SubSection": "Software, Firmware, and Information Integrity (SI-6)",
+          "Service": "aws"
+        }
+      ],
+      "Checks": [
+        "cloudtrail_log_file_validation_enabled",
+        "ecr_repositories_scan_on_push_enabled",
+        "ecr_repositories_immutable_tags_enabled",
+        "inspector2_active_findings_exist"
+      ]
+    },
+    {
+      "Id": "si-8-a",
+      "Name": "SI-8(a) Spam Protection",
+      "Description": "Employ spam protection mechanisms at system entry and exit points to detect and act on unsolicited messages.",
+      "Attributes": [
+        {
+          "ItemId": "si-8-a",
+          "Section": "System and Information Integrity (SI)",
+          "SubSection": "Spam Protection (SI-8)",
+          "Service": "aws"
+        }
+      ],
+      "Checks": [
+        "wafv2_webacl_logging_enabled",
+        "shield_advanced_enabled",
+        "guardduty_is_enabled",
+        "securityhub_enabled"
+      ]
+    },
+    {
+      "Id": "si-8-2",
+      "Name": "SI-8(2) Automatic Updates",
+      "Description": "Update spam protection mechanisms when new releases are available.",
+      "Attributes": [
+        {
+          "ItemId": "si-8-2",
+          "Section": "System and Information Integrity (SI)",
+          "SubSection": "Spam Protection (SI-8)",
+          "Service": "aws"
+        }
+      ],
+      "Checks": [
+        "wafv2_webacl_logging_enabled",
+        "guardduty_is_enabled",
+        "securityhub_enabled"
+      ]
+    },
+    {
+      "Id": "si-16",
+      "Name": "SI-16 Malicious Code Incident Analysis and Handling",
+      "Description": "Develop, document, and maintain a capability designed to analyze and handle malicious code incidents.",
+      "Attributes": [
+        {
+          "ItemId": "si-16",
+          "Section": "System and Information Integrity (SI)",
+          "SubSection": "Memory Protection (SI-16)",
+          "Service": "aws"
+        }
+      ],
+      "Checks": [
+        "ssmincidents_enabled",
+        "guardduty_is_enabled",
+        "securityhub_enabled",
+        "cloudtrail_threat_detection_enumeration",
+        "cloudtrail_threat_detection_privilege_escalation",
+        "cloudtrail_threat_detection_llm_jacking"
       ]
     },
     {
@@ -1383,7 +1875,16 @@
         "elbv2_waf_acl_attached",
         "guardduty_is_enabled",
         "guardduty_no_high_severity_findings",
-        "securityhub_enabled"
+        "securityhub_enabled",
+        "ssmincidents_enabled",
+        "ssmincidents_replication_set_enabled",
+        "eventbridge_rules_exists",
+        "cloudtrail_threat_detection_enumeration",
+        "cloudtrail_threat_detection_privilege_escalation",
+        "cloudtrail_threat_detection_llm_jacking",
+        "macie_is_enabled",
+        "vpc_flow_logs_enabled",
+        "accessanalyzer_enabled_without_findings"
       ]
     },
     {
@@ -1439,6 +1940,102 @@
         "rds_instance_backup_enabled",
         "redshift_cluster_automated_snapshot",
         "s3_bucket_object_versioning"
+      ]
+    },
+    {
+      "Id": "ac-11-a",
+      "Name": "AC-11(a) Session Lock",
+      "Description": "Employ session lock with pattern-hiding displays to prevent access/viewing of data after a period of inactivity.",
+      "Attributes": [
+        {
+          "ItemId": "ac-11-a",
+          "Section": "Access Control (AC)",
+          "SubSection": "Session Lock (AC-11)",
+          "Service": "aws"
+        }
+      ],
+      "Checks": [
+        "iam_password_policy_minimum_length_14",
+        "appstream_fleet_session_idle_disconnect_timeout",
+        "appstream_fleet_session_disconnect_timeout",
+        "appstream_fleet_maximum_session_duration"
+      ]
+    },
+    {
+      "Id": "ac-11-b",
+      "Name": "AC-11(b) Session Lock Continuation", 
+      "Description": "Retain the session lock until the user reestablishes access using established identification and authentication procedures.",
+      "Attributes": [
+        {
+          "ItemId": "ac-11-b",
+          "Section": "Access Control (AC)",
+          "SubSection": "Session Lock (AC-11)",
+          "Service": "aws"
+        }
+      ],
+      "Checks": [
+        "iam_password_policy_minimum_length_14",
+        "iam_user_mfa_enabled_console_access",
+        "appstream_fleet_session_idle_disconnect_timeout"
+      ]
+    },
+    {
+      "Id": "ac-11-1",
+      "Name": "AC-11(1) Pattern-Hiding Displays", 
+      "Description": "Allow users to initiate a session lock with pattern-hiding displays.",
+      "Attributes": [
+        {
+          "ItemId": "ac-11-1",
+          "Section": "Access Control (AC)",
+          "SubSection": "Session Lock (AC-11)",
+          "Service": "aws"
+        }
+      ],
+      "Checks": [
+        "iam_password_policy_minimum_length_14",
+        "iam_user_mfa_enabled_console_access",
+        "appstream_fleet_session_idle_disconnect_timeout",
+        "appstream_fleet_session_disconnect_timeout"
+      ]
+    },
+    {
+      "Id": "ac-02-9",
+      "Name": "AC-2(9) Termination of Access",
+      "Description": "Notify account managers when accounts are no longer required, when users are terminated or transferred, or when system usage or need-to-know changes.",
+      "Attributes": [
+        {
+          "ItemId": "ac-02-9",
+          "Section": "Access Control (AC)",
+          "SubSection": "Account Management (AC-2)",
+          "Service": "aws"
+        }
+      ],
+      "Checks": [
+        "cloudtrail_cloudwatch_logging_enabled",
+        "cloudwatch_log_group_retention_policy_specific_days_enabled",
+        "eventbridge_rules_exists",
+        "iam_user_accesskey_unused",
+        "iam_user_console_access_unused",
+        "account_security_contact_information_is_registered"
+      ]
+    },
+    {
+      "Id": "sr-03-b",
+      "Name": "SR-03(b) Software Repair Strategy",
+      "Description": "Employ a strategy for software repairs that includes near-term, mid-term, and long-term goals.",
+      "Attributes": [
+        {
+          "ItemId": "sr-03-b",
+          "Section": "Supply Chain Risk Management (SR)",
+          "SubSection": "Supply Chain Controls and Processes (SR-3)",
+          "Service": "aws"
+        }
+      ],
+      "Checks": [
+        "ec2_instance_managed_by_ssm",
+        "ssm_managed_compliant_patching",
+        "securityhub_enabled",
+        "inspector2_is_enabled"
       ]
     }
   ]
