@@ -1031,7 +1031,7 @@
         }
       ],
       "Checks": [
-        "iam_user_mfa_enabled_console_access",
+        "iam_user_mfa_enabled_console_access"
       ]
     },
     {
